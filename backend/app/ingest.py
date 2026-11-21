@@ -131,6 +131,7 @@ def ingest_repository(repo_url: str, storage_dir: str | Path | None = None) -> d
         raise ValueError(f"Could not clone repository '{clean_url}'. Please ensure it exists and is public.")
     
     chunks_to_insert = []
+    files_to_insert = []
     total_files = 0
     
     # 3. Walk files and chunk by language
@@ -172,10 +173,10 @@ def ingest_repository(repo_url: str, storage_dir: str | Path | None = None) -> d
                 continue
                 
             file_id = str(uuid.uuid4())[:8]
-            client.execute(
+            files_to_insert.append((
                 "INSERT INTO files (id, repo_id, path, total_lines, content) VALUES (?, ?, ?, ?, ?)",
                 [file_id, repo_id, relative_path, len(lines), content]
-            )
+            ))
             total_files += 1
             
             if lang:
@@ -221,6 +222,12 @@ def ingest_repository(repo_url: str, storage_dir: str | Path | None = None) -> d
         client.close()
         raise ValueError(f"No readable code or text files found in {clean_url}.")
 
+    # Batch insert files in fast bulk operations (max 40 statements per HTTP call to Turso)
+    if files_to_insert:
+        batch_size = 40
+        for i in range(0, len(files_to_insert), batch_size):
+            client.batch(files_to_insert[i:i + batch_size])
+
     # 4. Generate vectors in-process and save (batch execute for high speed over HTTP)
     if chunks_to_insert:
         # Cap chunks per repo to stay well within 512MB RAM on cloud free tiers
@@ -253,7 +260,7 @@ def ingest_repository(repo_url: str, storage_dir: str | Path | None = None) -> d
             chunks_to_insert = balanced_chunks[:max_chunks]
 
         texts = [c["content"] for c in chunks_to_insert]
-        embeddings = embed_texts(texts, batch_size=64)
+        embeddings = embed_texts(texts)
         
         batch_statements = []
         for chunk, emb in zip(chunks_to_insert, embeddings):
@@ -266,8 +273,8 @@ def ingest_repository(repo_url: str, storage_dir: str | Path | None = None) -> d
                  chunk["start_line"], chunk["end_line"], chunk["content"], emb_str]
             ))
 
-        # Send in batches of 50 statements per HTTP request to Turso
-        batch_chunk_size = 50
+        # Send in batches of 40 statements per HTTP request to Turso
+        batch_chunk_size = 40
         for i in range(0, len(batch_statements), batch_chunk_size):
             slice_stmts = batch_statements[i:i + batch_chunk_size]
             client.batch(slice_stmts)
