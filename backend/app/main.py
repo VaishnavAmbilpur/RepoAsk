@@ -28,22 +28,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Configure CORS origins
-frontend_origin = os.getenv("FRONTEND_ORIGIN", "http://localhost:5173")
-allowed_origins = [
-    origin.strip() for origin in frontend_origin.split(",") if origin.strip()
-] + [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-]
-
+# Configure CORS (Allow all origins for public API)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|.*\.vercel\.app|.*\.pages\.dev)(:\d+)?",
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
