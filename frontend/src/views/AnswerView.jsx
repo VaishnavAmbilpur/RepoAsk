@@ -330,7 +330,7 @@ export default function AnswerView() {
       </div>
 
       {/* ── 3-Column Workspace Grid ── */}
-      <div className="flex-1 grid overflow-hidden transition-all duration-300 ease-in-out" style={{ gridTemplateColumns: sidebarOpen ? '240px minmax(0,1fr) 280px' : '0px minmax(0,1fr) 280px' }}>
+      <div className="flex-1 grid overflow-hidden transition-[grid-template-columns] duration-300 ease-in-out" style={{ gridTemplateColumns: sidebarOpen ? '240px minmax(0,1fr) 280px' : '0px minmax(0,1fr) 280px' }}>
 
         {/* ════ LEFT SIDEBAR (240px, collapsible) ════ */}
         <div className={`border-r border-[#1F1F24] bg-[#0D0D0F] flex flex-col gap-5 transition-all duration-300 ease-in-out ${sidebarOpen ? 'p-4 opacity-100 overflow-y-auto' : 'p-0 opacity-0 overflow-hidden pointer-events-none'}`}>
@@ -618,13 +618,13 @@ export default function AnswerView() {
                 onKeyDown={handleKeyDown}
                 placeholder={answerMarkdown ? "Ask a follow-up about this repo" : "Ask anything about this repo (e.g. How does request routing work?)"}
                 disabled={isAsking}
-                className="flex-1 border border-[#2A2A30] rounded-[10px] px-4 text-[14.5px] bg-[#101013] text-[#ECECEE] placeholder-[#6B6B75] transition-colors focus:outline-none focus:border-[#4ADE80]"
+                className="flex-1 min-w-0 border border-[#2A2A30] rounded-[10px] px-4 text-[14.5px] bg-[#101013] text-[#ECECEE] placeholder-[#6B6B75] transition-colors focus:outline-none focus:border-[#4ADE80]"
                 style={{ minHeight: '46px' }}
               />
               <button
                 type="submit"
                 disabled={isAsking || !question.trim()}
-                className="border-0 bg-[#4ADE80] text-[#052E16] rounded-[10px] text-[14px] font-bold flex items-center gap-2 hover:bg-[#86EFAC] transition-colors disabled:opacity-50 cursor-pointer"
+                className="shrink-0 border-0 bg-[#4ADE80] text-[#052E16] rounded-[10px] text-[14px] font-bold flex items-center gap-2 hover:bg-[#86EFAC] transition-colors disabled:opacity-50 cursor-pointer"
                 style={{ minHeight: '46px', padding: '0 20px' }}
               >
                 <span>Ask</span>
@@ -637,7 +637,7 @@ export default function AnswerView() {
         </div>
 
         {/* ════ RIGHT SIDEBAR (280px) ════ */}
-        <div className="border-l border-[#1F1F24] bg-[#0D0D0F] flex flex-col gap-6 p-5 overflow-y-auto">
+        <div className="w-[280px] min-w-[280px] max-w-[280px] shrink-0 border-l border-[#1F1F24] bg-[#0D0D0F] flex flex-col gap-6 p-5 overflow-y-auto">
 
           {/* On this page (TOC with smooth scroll to headings) */}
           <div>
