@@ -223,8 +223,8 @@ def ingest_repository(repo_url: str, storage_dir: str | Path | None = None) -> d
 
     # 4. Generate vectors in-process and save (batch execute for high speed over HTTP)
     if chunks_to_insert:
-        # Cap chunks per repo to prevent HTTP timeouts on cloud free tiers
-        max_chunks = 200
+        # Cap chunks per repo to stay well within 512MB RAM on cloud free tiers
+        max_chunks = 120
         if len(chunks_to_insert) > max_chunks:
             # Separate priority chunks (root README, entry points, architecture docs)
             priority_chunks = []
