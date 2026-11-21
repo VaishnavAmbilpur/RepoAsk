@@ -10,14 +10,11 @@ import asyncio
 from app.ingest import ingest_repository
 from app.ask import ask_repo, get_file_content
 from app.db import get_db, init_db
-from app.embeddings import get_embedding_model
 
 
 @asynccontextmanager
 async def lifespan(app):
     init_db()
-    # Pre-warm embedding model in background so first user request doesn't timeout
-    asyncio.create_task(asyncio.to_thread(get_embedding_model))
     yield
 
 
