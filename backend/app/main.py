@@ -140,10 +140,20 @@ async def ask_stream(repo_id: str, req: AskRequest):
                 "detail": "Searching repository files and code chunks...",
                 "state": "active"
             })
-            await asyncio.sleep(0.3)
 
-            # Perform semantic search and answer generation via LangGraph workflow in worker thread
-            result = await asyncio.to_thread(ask_repo, repo_id, req.question, req.conversation_id)
+            # Run LangGraph workflow as background task with SSE keep-alive heartbeats
+            # to prevent Render reverse proxy from dropping idle connections (>15s)
+            ask_task = asyncio.create_task(
+                asyncio.to_thread(ask_repo, repo_id, req.question, req.conversation_id)
+            )
+
+            # Send heartbeat ping every 2.5s while computing to keep TCP socket alive
+            while not ask_task.done():
+                await asyncio.sleep(2.5)
+                if not ask_task.done():
+                    yield ": ping\n\n"
+
+            result = await ask_task
             
             citations = result.get("citations", [])
             retrieved = result.get("retrieved_chunks", [])
@@ -200,7 +210,13 @@ async def ask_stream(repo_id: str, req: AskRequest):
         except Exception as e:
             yield sse("error", {"message": str(e)})
 
-    return StreamingResponse(generate(), media_type="text/event-stream")
+    headers = {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "Content-Type": "text/event-stream",
+        "X-Accel-Buffering": "no",
+    }
+    return StreamingResponse(generate(), media_type="text/event-stream", headers=headers)
 
 
 @app.post("/api/ask")
