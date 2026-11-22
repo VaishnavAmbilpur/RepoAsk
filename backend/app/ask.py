@@ -25,8 +25,123 @@ def cosine_similarity(v1: list, v2: list) -> float:
         return 0.0
     return float(np.dot(a, b) / (norm_a * norm_b))
 
+def classify_query_intent(query: str) -> dict:
+    """Classifies user query into Track A (local point-lookup) or Track B (global aggregation)."""
+    q = query.lower()
+
+    # Schemas, Models, Databases, Data entities
+    is_schema = any(w in q for w in [
+        "schema", "schemas", "model", "models", "entity", "entities",
+        "table", "tables", "collection", "collections", "dto", "types", "interface"
+    ])
+
+    # Routes, Endpoints, APIs, Controllers
+    is_route = any(w in q for w in [
+        "route", "routes", "endpoint", "endpoints", "api", "apis",
+        "controller", "controllers", "handler", "handlers", "urls"
+    ])
+
+    # Global / Aggregation keywords
+    has_agg_word = any(w in q for w in [
+        "all", "every", "list", "what are the", "show me all", "what schemas",
+        "which schemas", "what models", "what routes", "overview", "catalog", "summary",
+        "database structure", "data models"
+    ])
+
+    if is_schema and (has_agg_word or len(q.split()) <= 4):
+        return {"track": "global", "category": "schema"}
+
+    if is_route and (has_agg_word or len(q.split()) <= 4):
+        return {"track": "global", "category": "route"}
+
+    is_arch = any(w in q for w in [
+        "architecture", "tech stack", "technologies", "structure", "components",
+        "how is this built", "what libraries", "dependencies"
+    ])
+    if is_arch:
+        return {"track": "global", "category": "architecture"}
+
+    return {"track": "local", "category": "general"}
+
+
+def search_global_catalog(repo_id: str, category: str, top_k: int = 14) -> list:
+    """Track B: Collects key definition chunks from matching files across the repository."""
+    client = get_db()
+
+    if category == "schema":
+        patterns = ["%model%", "%schema%", "%entit%", "%type%", "%dto%", "%table%"]
+    elif category == "route":
+        patterns = ["%route%", "%controller%", "%api%", "%endpoint%", "%handler%"]
+    else:
+        patterns = ["%readme%", "%package.json%", "%pyproject.toml%", "%go.mod%", "%cargo.toml%"]
+
+    like_clauses = " OR ".join(["LOWER(path) LIKE ?" for _ in patterns])
+    sql = f"SELECT id, path FROM files WHERE repo_id = ? AND ({like_clauses})"
+    params = [repo_id] + patterns
+    matched_files = client.execute(sql, params).rows
+
+    matched_file_ids = {r[0]: r[1] for r in matched_files}
+    chunks = []
+
+    if matched_file_ids:
+        placeholders = ",".join(["?" for _ in matched_file_ids])
+        chunk_sql = f"""
+            SELECT id, path, start_line, end_line, content
+            FROM chunks
+            WHERE repo_id = ? AND file_id IN ({placeholders})
+            ORDER BY start_line ASC
+        """
+        chunk_rows = client.execute(chunk_sql, [repo_id] + list(matched_file_ids.keys())).rows
+
+        file_chunk_count = {}
+        for row in chunk_rows:
+            cid, path, sl, el, content = row
+            count = file_chunk_count.get(path, 0)
+            if count < 2:  # Up to 2 chunks per matching file to ensure diverse catalog
+                chunks.append({
+                    "id": cid,
+                    "path": path,
+                    "start_line": int(sl),
+                    "end_line": int(el),
+                    "content": content,
+                    "score": 1.2 - (0.05 * count)
+                })
+                file_chunk_count[path] = count + 1
+                if len(chunks) >= top_k - 2:
+                    break
+
+    # Also grab root README for architectural context
+    readme_row = client.execute(
+        "SELECT path, content FROM files WHERE repo_id = ? AND LOWER(path) IN ('readme.md', 'readme.rst', 'readme.txt')",
+        [repo_id]
+    ).rows
+    client.close()
+
+    if readme_row and readme_row[0][1]:
+        readme_lines = readme_row[0][1].splitlines()[:50]
+        chunks.insert(0, {
+            "id": "root-readme",
+            "path": readme_row[0][0],
+            "start_line": 1,
+            "end_line": min(len(readme_lines), 50),
+            "content": "\n".join(readme_lines),
+            "score": 1.5
+        })
+
+    return chunks[:top_k]
+
+
 def search_code(repo_id: str, query: str, top_k: int = 10) -> list:
-    """Hybrid search: Combines semantic vector similarity with BM25 keyword matching."""
+    """Dual-Track search: routes to Global File-Tree aggregator or Local Hybrid search."""
+    intent = classify_query_intent(query)
+    
+    # If Track B (Global Query), execute file-tree aggregator
+    if intent["track"] == "global":
+        catalog_chunks = search_global_catalog(repo_id, intent["category"], top_k=max(top_k, 12))
+        if len(catalog_chunks) >= 3:
+            return catalog_chunks
+
+    # Otherwise execute Track A (Local Hybrid Search)
     client = get_db()
     
     # 1. Embed query

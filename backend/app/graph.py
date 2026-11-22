@@ -376,9 +376,21 @@ def synthesize_node(state: RepoAskState) -> Dict[str, Any]:
         if needs_flowchart else ""
     )
 
+    is_catalog_query = any(w in q_low for w in [
+        "schema", "schemas", "model", "models", "entity", "entities", 
+        "table", "tables", "route", "routes", "endpoint", "endpoints", "all", "every", "list"
+    ])
+
+    catalog_instruction = (
+        "\n\nCATALOG REQUIREMENT: The user asks for a catalog or enumeration of items (e.g. schemas, models, routes). "
+        "You MUST organize the answer as a structured table or detailed list itemizing EVERY component found across the retrieved files. "
+        "Include its name, attributes/purpose, and its exact file path."
+        if is_catalog_query else ""
+    )
+
     user_prompt = (
         f"Retrieved context (files and their contents):\n{context_text}\n\n"
-        f"Question: {question}{flowchart_instruction}"
+        f"Question: {question}{flowchart_instruction}{catalog_instruction}"
     )
 
     # Use LangChain Core message structures directly

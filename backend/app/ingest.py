@@ -233,14 +233,23 @@ def ingest_repository(repo_url: str, storage_dir: str | Path | None = None) -> d
         # Cap chunks per repo to stay well within 512MB RAM on cloud free tiers
         max_chunks = 120
         if len(chunks_to_insert) > max_chunks:
-            # Separate priority chunks (root README, entry points, architecture docs)
+            # Separate priority chunks (root README, entry points, schemas/models, routes)
             priority_chunks = []
             standard_chunks = []
+            
+            # Structural keywords that must never be dropped
+            structural_patterns = [
+                "readme.md", "readme.rst", "readme.txt",
+                "main.py", "app.py", "index.js", "index.ts", "server.js", "package.json", "go.mod", "cargo.toml",
+                "/model", "/schema", "/entit", "/type", "/dto", "/table",
+                "model.", "schema.", "entity.", "types.",
+                "/route", "/controller", "/api/", "/endpoint",
+                "route.", "controller.", "api."
+            ]
+
             for c in chunks_to_insert:
                 p_low = c["path"].lower()
-                if p_low in ["readme.md", "readme.rst", "readme.txt"] or p_low.endswith("/readme.md"):
-                    priority_chunks.append(c)
-                elif any(p_low.endswith(x) for x in ["main.py", "app.py", "index.js", "index.ts", "server.js", "package.json", "go.mod", "cargo.toml"]):
+                if any(pat in p_low for pat in structural_patterns):
                     priority_chunks.append(c)
                 else:
                     standard_chunks.append(c)

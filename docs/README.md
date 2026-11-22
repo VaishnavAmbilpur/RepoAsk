@@ -16,6 +16,8 @@
 | 8 | [Deployment & Setup](08-deployment-and-setup.md) | Local dev setup, project structure, environment variables, production deployment |
 | 9 | [Security & Limitations](09-security-and-limitations.md) | Security model, known limitations by category |
 | 10 | [Roadmap](10-roadmap.md) | Completed features, short-term improvements, medium-term vision |
+| 11 | [Deployment Guide](11-deployment-guide.md) | Step-by-step free zero cold-start deployment guide |
+| 12 | [Challenges: Global Query & Dual-Track](12-challenges-global-query-dual-track.md) | The Global Query Problem, root cause analysis, and Dual-Track solution (ASD-STE) |
 | **U1** | **[Upgrade 01 — AI Pipeline Overhaul](Upgrade_01.md)** | **9-phase plan to use LangChain & LangGraph at full potential, with alternatives for each decision** |
 
 ## Quick Start
