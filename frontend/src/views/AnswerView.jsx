@@ -86,6 +86,61 @@ function parseAnswer(md) {
   return { title, shortAnswer, body, sources };
 }
 
+function QuestionBar({ onSubmit, isAsking, placeholder, inputRef }) {
+  const [query, setQuery] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const clean = query.trim();
+    if (!clean || isAsking) return;
+    onSubmit(clean);
+    setQuery('');
+  };
+
+  const handleKeyDown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
+  return (
+    <div className="flex-none px-6 md:px-9 py-3.5 border-t border-[#1F1F24] bg-[#0A0A0B]/95 backdrop-blur-md">
+      <form onSubmit={handleSubmit} autoComplete="off" className="flex gap-2.5 items-stretch max-w-[1200px]">
+        <label htmlFor="q" className="sr-only">Ask a question</label>
+        <input
+          id="q"
+          name="repo_query_input"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="off"
+          spellCheck="false"
+          data-lpignore="true"
+          ref={inputRef}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          disabled={isAsking}
+          className="flex-1 min-w-0 border border-[#2A2A30] rounded-[10px] px-4 text-[14.5px] bg-[#101013] text-[#ECECEE] placeholder-[#6B6B75] transition-colors focus:outline-none focus:border-[#4ADE80]"
+          style={{ minHeight: '46px' }}
+        />
+        <button
+          type="submit"
+          disabled={isAsking || !query.trim()}
+          className="shrink-0 border-0 bg-[#4ADE80] text-[#052E16] rounded-[10px] text-[14px] font-bold flex items-center gap-2 hover:bg-[#86EFAC] transition-colors disabled:opacity-50 cursor-pointer"
+          style={{ minHeight: '46px', padding: '0 20px' }}
+        >
+          <span>Ask</span>
+          <span className="kbd text-[11px] font-bold font-mono" style={{ color: '#052E16', background: '#86EFAC', borderColor: '#86EFAC' }}>
+            Ctrl ↵
+          </span>
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function AnswerView() {
   const { repoId } = useParams();
   const navigate = useNavigate();
@@ -93,7 +148,6 @@ export default function AnswerView() {
   const [repoData, setRepoData] = useState(null);
 
   // Question & Chat State
-  const [question, setQuestion] = useState('');
   const [isAsking, setIsAsking] = useState(false);
   const [currentQuestionText, setCurrentQuestionText] = useState('');
   const [answerMarkdown, setAnswerMarkdown] = useState('');
@@ -130,12 +184,11 @@ export default function AnswerView() {
   }, [repoId]);
 
   const executeAsk = (queryText) => {
-    const q = (queryText || question).trim();
+    const q = (queryText || '').trim();
     if (!q || isAsking) return;
 
     if (abortStreamRef.current) abortStreamRef.current();
 
-    setQuestion('');
     setCurrentQuestionText(q);
     setIsAsking(true);
     setAnswerMarkdown('');
@@ -216,17 +269,9 @@ export default function AnswerView() {
     setAnswerMarkdown('');
     setCurrentQuestionText('');
     setActiveHistoryIndex(-1);
-    setQuestion('');
     setStreamError(null);
     if (inputRef.current) {
       inputRef.current.focus();
-    }
-  };
-
-  const handleKeyDown = (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      e.preventDefault();
-      executeAsk();
     }
   };
 
@@ -329,11 +374,11 @@ export default function AnswerView() {
         </button>
       </div>
 
-      {/* ── 3-Column Workspace Grid ── */}
-      <div className="flex-1 grid overflow-hidden transition-[grid-template-columns] duration-300 ease-in-out" style={{ gridTemplateColumns: sidebarOpen ? '240px minmax(0,1fr) 280px' : '0px minmax(0,1fr) 280px' }}>
+      {/* ── 3-Column Workspace (Pure Flexbox - 100% Geometry-Locked) ── */}
+      <div className="flex-1 flex overflow-hidden w-full">
 
         {/* ════ LEFT SIDEBAR (240px, collapsible) ════ */}
-        <div className={`border-r border-[#1F1F24] bg-[#0D0D0F] flex flex-col gap-5 transition-all duration-300 ease-in-out ${sidebarOpen ? 'p-4 opacity-100 overflow-y-auto' : 'p-0 opacity-0 overflow-hidden pointer-events-none'}`}>
+        <div className={`shrink-0 border-r border-[#1F1F24] bg-[#0D0D0F] flex flex-col gap-5 transition-[width,padding,opacity] duration-300 ease-in-out ${sidebarOpen ? 'w-[240px] p-4 opacity-100 overflow-y-auto' : 'w-0 p-0 opacity-0 overflow-hidden pointer-events-none'}`}>
           <button
             onClick={handleNewQuestion}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-lg text-[13.5px] font-semibold text-[#052E16] bg-[#4ADE80] hover:bg-[#86EFAC] hover:text-[#02200D] border border-[#4ADE80] hover:border-[#86EFAC] shadow-sm transition-all duration-150 cursor-pointer active:scale-[0.99]"
@@ -596,48 +641,17 @@ export default function AnswerView() {
             )}
           </div>
 
-          {/* ── Pinned Sticky Input Footer ── */}
-          <div className="flex-none px-6 md:px-9 py-3.5 border-t border-[#1F1F24] bg-[#0A0A0B]/95 backdrop-blur-md">
-            <form
-              onSubmit={(e) => { e.preventDefault(); executeAsk(); }}
-              autoComplete="off"
-              className="flex gap-2.5 items-stretch max-w-[1200px]"
-            >
-              <label htmlFor="q" className="sr-only">Ask a question</label>
-              <input
-                id="q"
-                name="repo_query_input"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck="false"
-                data-lpignore="true"
-                ref={inputRef}
-                value={question}
-                onChange={(e) => setQuestion(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={answerMarkdown ? "Ask a follow-up about this repo" : "Ask anything about this repo (e.g. How does request routing work?)"}
-                disabled={isAsking}
-                className="flex-1 min-w-0 border border-[#2A2A30] rounded-[10px] px-4 text-[14.5px] bg-[#101013] text-[#ECECEE] placeholder-[#6B6B75] transition-colors focus:outline-none focus:border-[#4ADE80]"
-                style={{ minHeight: '46px' }}
-              />
-              <button
-                type="submit"
-                disabled={isAsking || !question.trim()}
-                className="shrink-0 border-0 bg-[#4ADE80] text-[#052E16] rounded-[10px] text-[14px] font-bold flex items-center gap-2 hover:bg-[#86EFAC] transition-colors disabled:opacity-50 cursor-pointer"
-                style={{ minHeight: '46px', padding: '0 20px' }}
-              >
-                <span>Ask</span>
-                <span className="kbd text-[11px] font-bold font-mono" style={{ color: '#052E16', background: '#86EFAC', borderColor: '#86EFAC' }}>
-                  Ctrl ↵
-                </span>
-              </button>
-            </form>
-          </div>
+          {/* ── Pinned Sticky Input Footer (Isolated State - Zero Whole-Page Re-renders) ── */}
+          <QuestionBar
+            onSubmit={executeAsk}
+            isAsking={isAsking}
+            placeholder={answerMarkdown ? "Ask a follow-up about this repo" : "Ask anything about this repo (e.g. How does request routing work?)"}
+            inputRef={inputRef}
+          />
         </div>
 
-        {/* ════ RIGHT SIDEBAR (280px) ════ */}
-        <div className="w-[280px] min-w-[280px] max-w-[280px] shrink-0 border-l border-[#1F1F24] bg-[#0D0D0F] flex flex-col gap-6 p-5 overflow-y-auto">
+        {/* ════ RIGHT SIDEBAR (280px, strictly locked) ════ */}
+        <div className="w-[280px] shrink-0 border-l border-[#1F1F24] bg-[#0D0D0F] flex flex-col gap-6 p-5 overflow-y-auto">
 
           {/* On this page (TOC with smooth scroll to headings) */}
           <div>
